@@ -1,15 +1,13 @@
 // MenuLoad/ImGuiDrawView.mm
-// Minimal UIKit + Metal renderer for Dear ImGui on iOS.
-// Requires Dear ImGui core sources and backends/imgui_impl_metal.{h,mm}.
-
 #import "ImGuiDrawView.h"
 
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
 #import <QuartzCore/QuartzCore.h>
 
-#include "imgui.h"
-#include "backends/imgui_impl_metal.h"
+// SỬA LẠI ĐƯỜNG DẪN Ở ĐÂY
+#include "../ImGui/imgui.h"
+#include "../ImGui/imgui_impl_metal.h"
 #include "UserMenu.h"
 
 @interface ImGuiDrawView () <MTKViewDelegate>
@@ -56,8 +54,7 @@ static __weak ImGuiDrawView *s_activeView = nil;
         ImGuiIO &io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.DisplaySize = ImVec2(frame.size.width, frame.size.height);
-        io.DisplayFramebufferScale = ImVec2(UIScreen.mainScreen.scale,
-                                             UIScreen.mainScreen.scale);
+        io.DisplayFramebufferScale = ImVec2(UIScreen.mainScreen.scale, UIScreen.mainScreen.scale);
 
         ImGui::StyleColorsDark();
         ImGuiStyle &style = ImGui::GetStyle();
@@ -77,8 +74,7 @@ static __weak ImGuiDrawView *s_activeView = nil;
     CGSize size = self.metalView.bounds.size;
     ImGuiIO &io = ImGui::GetIO();
     io.DisplaySize = ImVec2(size.width, size.height);
-    io.DisplayFramebufferScale = ImVec2(self.metalView.contentScaleFactor,
-                                         self.metalView.contentScaleFactor);
+    io.DisplayFramebufferScale = ImVec2(self.metalView.contentScaleFactor, self.metalView.contentScaleFactor);
 }
 
 - (void)drawInMTKView:(MTKView *)view {
@@ -94,18 +90,15 @@ static __weak ImGuiDrawView *s_activeView = nil;
     ImGui_ImplMetal_NewFrame(pass);
     ImGuiIO &io = ImGui::GetIO();
     io.DisplaySize = ImVec2(view.bounds.size.width, view.bounds.size.height);
-    io.DisplayFramebufferScale = ImVec2(view.contentScaleFactor,
-                                         view.contentScaleFactor);
+    io.DisplayFramebufferScale = ImVec2(view.contentScaleFactor, view.contentScaleFactor);
 
     ImGui::NewFrame();
     UserMenu::GetInstance().RenderingMenu();
     ImGui::Render();
 
-    id<MTLRenderCommandEncoder> encoder =
-        [commandBuffer renderCommandEncoderWithDescriptor:pass];
+    id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:pass];
     if (encoder != nil) {
-        ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(),
-                                       commandBuffer, encoder);
+        ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), commandBuffer, encoder);
         [encoder endEncoding];
     }
 
@@ -116,8 +109,7 @@ static __weak ImGuiDrawView *s_activeView = nil;
 - (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {
     if (!self.imguiReady) return;
     ImGuiIO &io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(size.width / view.contentScaleFactor,
-                            size.height / view.contentScaleFactor);
+    io.DisplaySize = ImVec2(size.width / view.contentScaleFactor, size.height / view.contentScaleFactor);
 }
 
 + (void)showChange:(BOOL)open {
@@ -135,6 +127,7 @@ static __weak ImGuiDrawView *s_activeView = nil;
     return (view != nil && view.menuVisible && !view.view.hidden);
 }
 
+// PHẦN NHẬN TOUCH (BẮT BUỘC ĐỂ BẤM NÚT)
 - (void)updateIOWithTouchEvent:(UIEvent *)event {
     if (!self.imguiReady) return;
 
@@ -159,6 +152,11 @@ static __weak ImGuiDrawView *s_activeView = nil;
             break;
     }
 }
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
+- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
 
 - (void)dealloc {
     if (self.imguiReady) {
