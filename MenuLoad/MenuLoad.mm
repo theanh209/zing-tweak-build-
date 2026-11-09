@@ -8,6 +8,7 @@ https://github.com/VenerableCode/iOS-Theos-ModMenuTemp-NoJB
 
 #import <UIKit/UIKit.h>
 #include "Includes.h"
+#import "ImGuiDrawView.h"
 
 @interface MenuLoad()
 
