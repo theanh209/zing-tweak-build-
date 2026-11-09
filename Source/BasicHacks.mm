@@ -1,26 +1,21 @@
 // File: Source/BasicHacks.mm 
 #import "BasicHacks.h"
 #include "../MenuLoad/Includes.h"
+#include "../utils/KPatch.hpp" // <--- THÊM DÒNG NÀY
 #include <chrono>
 #include <thread>
 
-// =====================================================================
-// KHU VỰC ĐIỀN OFFSET
-// =====================================================================
 namespace offsets {
     constexpr uintptr_t OFFSET_GWorld                   = 0x0000000; 
     constexpr uintptr_t OFFSET_OwningGameInstance       = 0x0000000; 
     constexpr uintptr_t OFFSET_LocalPlayers             = 0x0000000; 
     constexpr uintptr_t OFFSET_LocalPlayerController    = 0x0000000; 
     constexpr uintptr_t OFFSET_Kart                     = 0x0000000; 
-
     constexpr uintptr_t OFFSET_VoHanNitro               = 0x0000000; 
     constexpr uintptr_t OFFSET_GiaToc                   = 0x0000000; 
     constexpr uintptr_t OFFSET_HP                       = 0x0000000; 
 }
-// =====================================================================
 
-// BẮT BUỘC PHẢI CÓ DÒNG NÀY
 CheatVars Cheats; 
 
 void BasicHacks::HacksThread() {
@@ -65,7 +60,6 @@ void BasicHacks::HacksThread() {
 @implementation GameLoop {
     dispatch_source_t _timer;
 }
-
 - (void)start {
     dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
     _timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
@@ -76,7 +70,6 @@ void BasicHacks::HacksThread() {
         dispatch_resume(_timer);
     }
 }
-
 - (void)stop {
     if (_timer) { dispatch_source_cancel(_timer); }
 }
