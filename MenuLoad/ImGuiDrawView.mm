@@ -1,191 +1,172 @@
-// File: MenuLoad/UserMenu.mm
-#include "UserMenu.h"
-#include "Includes.h"
+// MenuLoad/ImGuiDrawView.mm
+// Minimal UIKit + Metal renderer for Dear ImGui on iOS.
+// Requires Dear ImGui core sources and backends/imgui_impl_metal.{h,mm}.
+
+#import "ImGuiDrawView.h"
+
+#import <Metal/Metal.h>
+#import <MetalKit/MetalKit.h>
+#import <QuartzCore/QuartzCore.h>
+
 #include "imgui.h"
-#include "imgui_internal.h"
+#include "backends/imgui_impl_metal.h"
+#include "UserMenu.h"
 
-void UserMenu::RenderingMenu() {
-    // ==========================================
-    // PHẦN 1: NÚT TELEPORT TRÒN TRONG SUỐT
-    // ==========================================
-    if (Cheats.TeleportButton) {
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        
-        // Cửa sổ vô hình chứa nút
-        ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 100, ImGui::GetIO().DisplaySize.y / 2), ImGuiCond_FirstUseEver);
-        ImGui::Begin("TeleportOverlay", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_AlwaysAutoResize);
+@interface ImGuiDrawView () <MTKViewDelegate>
+@property (nonatomic, strong) MTKView *metalView;
+@property (nonatomic, strong) id<MTLCommandQueue> commandQueue;
+@property (nonatomic, assign) BOOL imguiReady;
+@property (nonatomic, assign) BOOL menuVisible;
+@end
 
-        // Style: Bo tròn hoàn toàn
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 30.0f); 
-        // Viền dày 2px
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f); 
-        
-        // Màu nền trong suốt 100% (Alpha = 0)
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); 
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.1f)); // Hover lên thì hơi sáng nhẹ
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 1.0f, 1.0f, 0.2f));
-        
-        // Màu viền trắng mờ (Alpha = 0.4)
-        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 1.0f, 0.4f)); 
-        
-        // Màu chữ Đỏ
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f)); 
+@implementation ImGuiDrawView
 
-        // Kích thước nút 60x60
-        if (ImGui::Button("Tele", ImVec2(60, 60))) {
-            // ==========================================
-            // XỬ LÝ KHI BẤM NÚT TELEPORT
-            // ==========================================
-            // Nhét code gọi hàm teleport ở đây.
-        }
-        
-        // Trả lại style cũ
-        ImGui::PopStyleColor(5);
-        ImGui::PopStyleVar(4);
-        ImGui::End();
+static __weak ImGuiDrawView *s_activeView = nil;
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _menuVisible = YES;
     }
-
-    // ==========================================
-    // PHẦN 2: MENU CHÍNH
-    // ==========================================
-    if (!isMenuOpen) return; 
-
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowRounding = 8.0f;
-    style.FrameRounding = 4.0f;
-    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.95f);
-    style.Colors[ImGuiCol_TitleBg] = ImVec4(0.12f, 0.12f, 0.12f, 1.0f);
-    style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f, 0.15f, 0.15f, 1.0f);
-    style.Colors[ImGuiCol_CheckMark] = ImVec4(0.2f, 1.0f, 0.5f, 1.0f);
-    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
-
-    ImGui::SetNextWindowSize(ImVec2(480, 580), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Zing Speed Mobile | Dev: Ng The Anh", &isMenuOpen, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
-
-    if (ImGui::BeginTabBar("MenuTabs", ImGuiTabBarFlags_None)) {
-        
-        // ================= TAB 1: GAME CHEATS =================
-        if (ImGui::BeginTabItem("Tinh Chinh Game")) {
-            ImGui::Spacing();
-            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Di Chuyen & Toc Do");
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            ImGui::Columns(2, nullptr, false);
-            ImGui::Checkbox("Vo Han Nitro", &Cheats.VoHanNitro);
-            ImGui::Checkbox("Nitro Nhanh", &Cheats.NitroNhanh);
-            ImGui::Checkbox("Gia Toc", &Cheats.GiaToc);
-            ImGui::NextColumn();
-            
-            ImGui::Checkbox("Mini Boot", &Cheats.MiniBoot);
-            ImGui::Checkbox("Thoat Nhanh", &Cheats.ThoatNhanh);
-            ImGui::Columns(1);
-
-            ImGui::Spacing();
-            ImGui::Spacing();
-            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Teleport & Map");
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            ImGui::Columns(2, nullptr, false);
-            ImGui::Checkbox("Teleport Auto", &Cheats.TeleportAuto);
-            ImGui::Checkbox("ECU 3 Luot", &Cheats.ECU3Luot);
-            ImGui::NextColumn();
-            
-            ImGui::Checkbox("Teleport Button", &Cheats.TeleportButton); // Nút bật tắt Overlay
-            
-            ImGui::Checkbox("Fake Ten", &Cheats.FakeTen);
-            ImGui::Columns(1);
-
-            ImGui::Spacing();
-            ImGui::Spacing();
-            
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
-            ImGui::BeginChild("MapInfoBox", ImVec2(0, 60), true);
-            ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Map ID hien tai:");
-            ImGui::SameLine();
-            ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.5f, 1.0f), "157 (Ho Long Tinh)");
-            if (ImGui::TreeNode("Xem danh sach map thieu data")) {
-                ImGui::BulletText("Map 1: Chua cap nhat");
-                ImGui::BulletText("Map 2: Chua cap nhat");
-                ImGui::TreePop();
-            }
-            ImGui::EndChild();
-            ImGui::PopStyleColor();
-
-            ImGui::EndTabItem();
-        }
-
-        // ================= TAB 2: AUTO PLAY =================
-        if (ImGui::BeginTabItem("Auto Dua")) {
-            ImGui::Spacing();
-            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "He Thong Tu Dong");
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            ImGui::Checkbox("Auto Dua Lap Trinh", &Cheats.AutoDuaLapTrinh);
-            ImGui::Spacing();
-
-            if (ImGui::RadioButton("1. Theo duong huong dan", Cheats.AutoMode == 1)) { Cheats.AutoMode = 1; }
-            if (ImGui::RadioButton("2. Tu ra giua duong", Cheats.AutoMode == 2)) { Cheats.AutoMode = 2; }
-            
-            ImGui::Spacing();
-            ImGui::Separator();
-            
-            if (Cheats.AutoDuaLapTrinh) {
-                ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "Trang thai: DANG TU DONG DUA...");
-            } else {
-                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "Trang thai: DA TAT");
-            }
-
-            ImGui::EndTabItem();
-        }
-
-        // ================= TAB 3: THONG TIN & LUU Y =================
-        if (ImGui::BeginTabItem("Luu Y")) {
-            ImGui::Spacing();
-            ImGui::Checkbox("Ky Sinh", &Cheats.KySinh);
-            ImGui::Checkbox("Streamer Mode", &KTempVars.StreamerMode); 
-            
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "LUU Y QUAN TRONG:");
-            
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
-            ImGui::BeginChild("NoteBox", ImVec2(0, 150), true); 
-            
-            ImGui::TextWrapped("- Menu nay duoc phat trien boi Ng The Anh.");
-            ImGui::TextWrapped("- Vui long khong buon ban, chia se mien phi de cong dong phat trien.");
-            ImGui::TextWrapped("- Neu gap loi hay bao cao de duoc ho tro.");
-            ImGui::TextWrapped("- Su dung menu co the dan den bi khoa tai khoan. Hay su dung co trach nhiem!");
-            ImGui::TextWrapped("- Phien ban: 34306jit v1.0.0");
-            
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-            
-            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Lien he ho tro:");
-            ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Zalo: ");
-            ImGui::SameLine();
-            ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.5f, 1.0f), "0338442509");
-            
-            ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Telegram: ");
-            ImGui::SameLine();
-            ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.5f, 1.0f), "@tranggnekk");
-            
-            ImGui::EndChild();
-            ImGui::PopStyleColor();
-
-            ImGui::Spacing();
-            ImGui::TextDisabled("Copyright © 2024 Ng The Anh.");
-
-            ImGui::EndTabItem();
-        }
-        
-        ImGui::EndTabBar();
-    }
-    ImGui::End();
+    return self;
 }
+
+- (void)loadView {
+    CGRect frame = UIScreen.mainScreen.bounds;
+    MTKView *view = [[MTKView alloc] initWithFrame:frame];
+    view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    view.backgroundColor = UIColor.clearColor;
+    view.opaque = NO;
+    view.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 0.0);
+    view.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
+    view.depthStencilPixelFormat = MTLPixelFormatInvalid;
+    view.preferredFramesPerSecond = 60;
+    view.enableSetNeedsDisplay = NO;
+    view.paused = NO;
+    self.view = view;
+    self.metalView = view;
+    view.delegate = self;
+
+    id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+    view.device = device;
+    self.commandQueue = [device newCommandQueue];
+
+    if (device != nil && self.commandQueue != nil) {
+        ImGui::CreateContext();
+        ImGuiIO &io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.DisplaySize = ImVec2(frame.size.width, frame.size.height);
+        io.DisplayFramebufferScale = ImVec2(UIScreen.mainScreen.scale,
+                                             UIScreen.mainScreen.scale);
+
+        ImGui::StyleColorsDark();
+        ImGuiStyle &style = ImGui::GetStyle();
+        style.WindowRounding = 8.0f;
+        style.FrameRounding = 4.0f;
+
+        ImGui_ImplMetal_Init(device);
+        self.imguiReady = YES;
+        s_activeView = self;
+    }
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    if (!self.imguiReady) return;
+
+    CGSize size = self.metalView.bounds.size;
+    ImGuiIO &io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(size.width, size.height);
+    io.DisplayFramebufferScale = ImVec2(self.metalView.contentScaleFactor,
+                                         self.metalView.contentScaleFactor);
+}
+
+- (void)drawInMTKView:(MTKView *)view {
+    if (!self.imguiReady || !self.menuVisible) return;
+
+    MTLRenderPassDescriptor *pass = view.currentRenderPassDescriptor;
+    id<CAMetalDrawable> drawable = view.currentDrawable;
+    if (pass == nil || drawable == nil) return;
+
+    id<MTLCommandBuffer> commandBuffer = [self.commandQueue commandBuffer];
+    if (commandBuffer == nil) return;
+
+    ImGui_ImplMetal_NewFrame(pass);
+    ImGuiIO &io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(view.bounds.size.width, view.bounds.size.height);
+    io.DisplayFramebufferScale = ImVec2(view.contentScaleFactor,
+                                         view.contentScaleFactor);
+
+    ImGui::NewFrame();
+    UserMenu::GetInstance().RenderingMenu();
+    ImGui::Render();
+
+    id<MTLRenderCommandEncoder> encoder =
+        [commandBuffer renderCommandEncoderWithDescriptor:pass];
+    if (encoder != nil) {
+        ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(),
+                                       commandBuffer, encoder);
+        [encoder endEncoding];
+    }
+
+    [commandBuffer presentDrawable:drawable];
+    [commandBuffer commit];
+}
+
+- (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {
+    if (!self.imguiReady) return;
+    ImGuiIO &io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(size.width / view.contentScaleFactor,
+                            size.height / view.contentScaleFactor);
+}
+
++ (void)showChange:(BOOL)open {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        ImGuiDrawView *view = s_activeView;
+        if (view == nil) return;
+        view.menuVisible = open;
+        view.view.hidden = !open;
+        view.metalView.paused = !open;
+    });
+}
+
++ (BOOL)isMenuShowing {
+    ImGuiDrawView *view = s_activeView;
+    return (view != nil && view.menuVisible && !view.view.hidden);
+}
+
+- (void)updateIOWithTouchEvent:(UIEvent *)event {
+    if (!self.imguiReady) return;
+
+    UITouch *touch = event.allTouches.anyObject;
+    if (touch == nil) return;
+
+    CGPoint point = [touch locationInView:self.metalView];
+    ImGuiIO &io = ImGui::GetIO();
+    io.MousePos = ImVec2(point.x, point.y);
+
+    switch (touch.phase) {
+        case UITouchPhaseBegan:
+        case UITouchPhaseMoved:
+        case UITouchPhaseStationary:
+            io.MouseDown[0] = true;
+            break;
+        case UITouchPhaseEnded:
+        case UITouchPhaseCancelled:
+            io.MouseDown[0] = false;
+            break;
+        default:
+            break;
+    }
+}
+
+- (void)dealloc {
+    if (self.imguiReady) {
+        ImGui_ImplMetal_Shutdown();
+        ImGui::DestroyContext();
+        self.imguiReady = NO;
+    }
+    if (s_activeView == self) s_activeView = nil;
+}
+
+@end
