@@ -23,6 +23,8 @@ jobs:
         run: |
           export THEOS=$HOME/theos
           export PATH=$THEOS/bin:$PATH
+          # Cài đặt ldid để fix lỗi "command not found"
+          brew install ldid
           make clean package FINALPACKAGE=1
 
       - name: Upload .deb
