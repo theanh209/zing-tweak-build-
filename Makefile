@@ -9,11 +9,8 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = 34306jit
 
-# Đã bỏ chữ System khỏi FRAMEWORKS
+# Đã bỏ LIBRARIES = System (vì nó tự link, thêm vào bị duplicate)
 $(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security QuartzCore CoreGraphics CoreText AVFoundation Accelerate GLKit SystemConfiguration GameController Metal MetalKit
-
-# Thêm System vào LIBRARIES để fix lỗi vm_region
-$(TWEAK_NAME)_LIBRARIES = System
 
 # Cờ compile chuẩn
 $(TWEAK_NAME)_CCFLAGS = -std=c++17 -fno-rtti -DNDEBUG -Wall -Wno-deprecated-declarations -Wno-unused-variable -Wno-unused-value -Wno-unused-function -Wno-writable-strings -Wno-error -Wno-nontrivial-memcall -I./ImGui -I.
