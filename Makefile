@@ -9,10 +9,8 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = 34306jit
 
-# Đã bỏ LIBRARIES = System (vì nó tự link, thêm vào bị duplicate)
 $(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security QuartzCore CoreGraphics CoreText AVFoundation Accelerate GLKit SystemConfiguration GameController Metal MetalKit
 
-# Cờ compile chuẩn
 $(TWEAK_NAME)_CCFLAGS = -std=c++17 -fno-rtti -DNDEBUG -Wall -Wno-deprecated-declarations -Wno-unused-variable -Wno-unused-value -Wno-unused-function -Wno-writable-strings -Wno-error -Wno-nontrivial-memcall -I./ImGui -I.
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc -Wall -Wno-deprecated-declarations -Wno-unused-variable -Wno-unused-value -Wno-unused-function -Wno-error
 
@@ -21,5 +19,8 @@ $(TWEAK_NAME)_FILES = $(wildcard MenuLoad/*.mm) \
                       $(wildcard Source/*.mm) \
                       $(wildcard ImGui/*.mm) \
                       $(wildcard ImGui/*.cpp)
+
+# Dòng này cực kỳ quan trọng: Đóng gói file ảnh (logo.png) nằm trong thư mục MenuLoad vào file cài đặt
+$(TWEAK_NAME)_RESOURCE_DIRS = MenuLoad
 
 include $(THEOS_MAKE_PATH)/tweak.mk
