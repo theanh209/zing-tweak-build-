@@ -1,11 +1,6 @@
-// MenuLoad/ImGuiDrawView.mm
 #import "ImGuiDrawView.h"
-
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
-#import <QuartzCore/QuartzCore.h>
-
-// SỬA LẠI ĐƯỜNG DẪN Ở ĐÂY
 #include "../ImGui/imgui.h"
 #include "../ImGui/imgui_impl_metal.h"
 #include "UserMenu.h"
@@ -14,7 +9,6 @@
 @property (nonatomic, strong) MTKView *metalView;
 @property (nonatomic, strong) id<MTLCommandQueue> commandQueue;
 @property (nonatomic, assign) BOOL imguiReady;
-@property (nonatomic, assign) BOOL menuVisible;
 @end
 
 @implementation ImGuiDrawView
@@ -23,9 +17,7 @@ static __weak ImGuiDrawView *s_activeView = nil;
 
 - (instancetype)init {
     self = [super init];
-    if (self) {
-        _menuVisible = YES;
-    }
+    if (self) { _imguiReady = NO; }
     return self;
 }
 
@@ -37,10 +29,11 @@ static __weak ImGuiDrawView *s_activeView = nil;
     view.opaque = NO;
     view.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 0.0);
     view.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
-    view.depthStencilPixelFormat = MTLPixelFormatInvalid;
     view.preferredFramesPerSecond = 60;
     view.enableSetNeedsDisplay = NO;
     view.paused = NO;
+    view.userInteractionEnabled = YES;
+    
     self.view = view;
     self.metalView = view;
     view.delegate = self;
@@ -56,10 +49,8 @@ static __weak ImGuiDrawView *s_activeView = nil;
         io.DisplaySize = ImVec2(frame.size.width, frame.size.height);
         io.DisplayFramebufferScale = ImVec2(UIScreen.mainScreen.scale, UIScreen.mainScreen.scale);
 
-        ImGui::StyleColorsDark();
-        ImGuiStyle &style = ImGui::GetStyle();
-        style.WindowRounding = 8.0f;
-        style.FrameRounding = 4.0f;
+        // Load font mặc định
+        io.Fonts->AddFontDefault();
 
         ImGui_ImplMetal_Init(device);
         self.imguiReady = YES;
@@ -67,18 +58,8 @@ static __weak ImGuiDrawView *s_activeView = nil;
     }
 }
 
-- (void)viewDidLayoutSubviews {
-    [super viewDidLayoutSubviews];
-    if (!self.imguiReady) return;
-
-    CGSize size = self.metalView.bounds.size;
-    ImGuiIO &io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(size.width, size.height);
-    io.DisplayFramebufferScale = ImVec2(self.metalView.contentScaleFactor, self.metalView.contentScaleFactor);
-}
-
 - (void)drawInMTKView:(MTKView *)view {
-    if (!self.imguiReady || !self.menuVisible) return;
+    if (!self.imguiReady) return;
 
     MTLRenderPassDescriptor *pass = view.currentRenderPassDescriptor;
     id<CAMetalDrawable> drawable = view.currentDrawable;
@@ -93,7 +74,7 @@ static __weak ImGuiDrawView *s_activeView = nil;
     io.DisplayFramebufferScale = ImVec2(view.contentScaleFactor, view.contentScaleFactor);
 
     ImGui::NewFrame();
-    UserMenu::GetInstance().RenderingMenu();
+    UserMenu::GetInstance().RenderingMenu(); // Gọi vẽ Menu
     ImGui::Render();
 
     id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:pass];
@@ -106,31 +87,11 @@ static __weak ImGuiDrawView *s_activeView = nil;
     [commandBuffer commit];
 }
 
-- (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {
-    if (!self.imguiReady) return;
-    ImGuiIO &io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(size.width / view.contentScaleFactor, size.height / view.contentScaleFactor);
-}
-
-+ (void)showChange:(BOOL)open {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        ImGuiDrawView *view = s_activeView;
-        if (view == nil) return;
-        view.menuVisible = open;
-        view.view.hidden = !open;
-        view.metalView.paused = !open;
-    });
-}
-
-+ (BOOL)isMenuShowing {
-    ImGuiDrawView *view = s_activeView;
-    return (view != nil && view.menuVisible && !view.view.hidden);
-}
-
-// PHẦN NHẬN TOUCH (BẮT BUỘC ĐỂ BẤM NÚT)
+// ==========================================
+// XỬ LÝ TOUCH
+// ==========================================
 - (void)updateIOWithTouchEvent:(UIEvent *)event {
     if (!self.imguiReady) return;
-
     UITouch *touch = event.allTouches.anyObject;
     if (touch == nil) return;
 
@@ -148,8 +109,7 @@ static __weak ImGuiDrawView *s_activeView = nil;
         case UITouchPhaseCancelled:
             io.MouseDown[0] = false;
             break;
-        default:
-            break;
+        default: break;
     }
 }
 
@@ -157,6 +117,12 @@ static __weak ImGuiDrawView *s_activeView = nil;
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
+
+- (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {
+    if (!self.imguiReady) return;
+    ImGuiIO &io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(size.width / view.contentScaleFactor, size.height / view.contentScaleFactor);
+}
 
 - (void)dealloc {
     if (self.imguiReady) {
