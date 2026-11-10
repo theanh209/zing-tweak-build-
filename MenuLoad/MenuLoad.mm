@@ -14,8 +14,8 @@ static BOOL isMenuShowing = NO;
 @implementation MenuLoad
 
 + (void)load {
-    // Đợi 3 giây cho game load xong UI rồi mới setup
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // Đợi 5 giây cho game load xong hẳn
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         extraInfo = [[MenuLoad alloc] init];
         [extraInfo setupMenu];
     });
@@ -36,33 +36,17 @@ static BOOL isMenuShowing = NO;
     if (!window) return;
 
     // ==========================================
-    // 1. TẠO IMGUI VIEW (ẨN BẰNG ALPHA)
-    // ==========================================
-    self.imguiView = [[ImGuiDrawView alloc] init];
-    UIView *imguiAsView = (UIView *)self.imguiView;
-    imguiAsView.frame = window.bounds;
-    imguiAsView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    imguiAsView.userInteractionEnabled = YES;
-    
-    // QUAN TRỌNG: Ẩn bằng alpha thay vì hidden để tránh lỗi crash khi bật lại
-    imguiAsView.alpha = 0.0f; 
-    
-    [window addSubview:imguiAsView];
-
-    // ==========================================
-    // 2. TẠO NÚT TRÒN (CON KHỈ)
+    // CHỈ TẠO NÚT TRÒN, KHÔNG TẠO IMGUI LÚC NÀY
     // ==========================================
     self.menuButton = [UIButton buttonWithType:UIButtonTypeCustom];
     self.menuButton.frame = CGRectMake(50, 100, 60, 60);
     
-    // Style: Nền trong suốt, viền trắng mờ, bo góc
     self.menuButton.layer.cornerRadius = 30.0f; 
     self.menuButton.clipsToBounds = YES;
     self.menuButton.backgroundColor = [UIColor colorWithWhite:0.0f alpha:0.2f];
     self.menuButton.layer.borderWidth = 2.0f;
     self.menuButton.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.5f].CGColor;
     
-    // Tìm ảnh trong đường dẫn Rootless
     NSString *imagePath = @"/var/jb/Library/Application Support/34306jit/logo.png";
     UIImage *logoImage = [UIImage imageWithContentsOfFile:imagePath];
     
@@ -73,7 +57,6 @@ static BOOL isMenuShowing = NO;
         [self.menuButton setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
     }
 
-    // Gắn sự kiện bấm và kéo thả
     [self.menuButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [self.menuButton addGestureRecognizer:pan];
@@ -82,15 +65,42 @@ static BOOL isMenuShowing = NO;
 }
 
 - (void)toggleMenu {
-    if (!self.imguiView) return;
-    
-    isMenuShowing = !isMenuShowing;
-    UIView *imguiAsView = (UIView *)self.imguiView;
-    
-    // Hiệu ứng mờ dần (Fade in/out) tránh giật lag
-    [UIView animateWithDuration:0.2 animations:^{
-        imguiAsView.alpha = isMenuShowing ? 1.0f : 0.0f;
-    }];
+    // Bắt buộc phải chạy trên Main Thread để tránh crash Metal
+    dispatch_async(dispatch_get_main_queue(), ^{
+        
+        // Nếu chưa có ImGui View thì mới tạo (Lazy Load)
+        if (!self.imguiView) {
+            UIWindow *window = self.menuButton.superview;
+            if (!window) return;
+
+            self.imguiView = [[ImGuiDrawView alloc] init];
+            UIView *imguiAsView = (UIView *)self.imguiView;
+            imguiAsView.frame = window.bounds;
+            imguiAsView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            imguiAsView.userInteractionEnabled = YES;
+            
+            // Bắt đầu với độ mờ bằng 0 (để nó vẽ ngầm)
+            imguiAsView.alpha = 0.0f;
+            
+            [window addSubview:imguiAsView];
+            
+            // Đợi 0.1s cho Metal khởi tạo xong mới bật lên
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [UIView animateWithDuration:0.2 animations:^{
+                    imguiAsView.alpha = 1.0f;
+                }];
+            });
+            isMenuShowing = YES;
+            
+        } else {
+            // Nếu đã có rồi thì chỉ cần đổi độ mờ
+            isMenuShowing = !isMenuShowing;
+            UIView *imguiAsView = (UIView *)self.imguiView;
+            [UIView animateWithDuration:0.2 animations:^{
+                imguiAsView.alpha = isMenuShowing ? 1.0f : 0.0f;
+            }];
+        }
+    });
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
