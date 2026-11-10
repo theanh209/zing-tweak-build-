@@ -1,6 +1,9 @@
+// File: MenuLoad/ImGuiDrawView.mm
 #import "ImGuiDrawView.h"
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
+#import <QuartzCore/QuartzCore.h>
+
 #include "../ImGui/imgui.h"
 #include "../ImGui/imgui_impl_metal.h"
 #include "UserMenu.h"
@@ -13,7 +16,9 @@
 
 @implementation ImGuiDrawView
 
-static __weak ImGuiDrawView *s_activeView = nil;
+// Biến toàn cục để lưu vị trí chạm cuối cùng (dùng cho vuốt)
+static CGPoint s_lastTouchPos = {0, 0};
+static CFTimeInterval s_lastTouchTime = 0;
 
 - (instancetype)init {
     self = [super init];
@@ -32,6 +37,8 @@ static __weak ImGuiDrawView *s_activeView = nil;
     view.preferredFramesPerSecond = 60;
     view.enableSetNeedsDisplay = NO;
     view.paused = NO;
+    
+    // Bật tương tác để nhận vuốt
     view.userInteractionEnabled = YES;
     
     self.view = view;
@@ -49,12 +56,11 @@ static __weak ImGuiDrawView *s_activeView = nil;
         io.DisplaySize = ImVec2(frame.size.width, frame.size.height);
         io.DisplayFramebufferScale = ImVec2(UIScreen.mainScreen.scale, UIScreen.mainScreen.scale);
 
-        // Load font mặc định
+        // Dùng font mặc định để tránh lỗi
         io.Fonts->AddFontDefault();
 
         ImGui_ImplMetal_Init(device);
         self.imguiReady = YES;
-        s_activeView = self;
     }
 }
 
@@ -74,7 +80,7 @@ static __weak ImGuiDrawView *s_activeView = nil;
     io.DisplayFramebufferScale = ImVec2(view.contentScaleFactor, view.contentScaleFactor);
 
     ImGui::NewFrame();
-    UserMenu::GetInstance().RenderingMenu(); // Gọi vẽ Menu
+    UserMenu::GetInstance().RenderingMenu(); // Gọi hàm vẽ Menu
     ImGui::Render();
 
     id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:pass];
@@ -88,7 +94,7 @@ static __weak ImGuiDrawView *s_activeView = nil;
 }
 
 // ==========================================
-// XỬ LÝ TOUCH
+// XỬ LÝ VUỐT (Bật/tắt Menu thay cho nút bấm)
 // ==========================================
 - (void)updateIOWithTouchEvent:(UIEvent *)event {
     if (!self.imguiReady) return;
@@ -96,20 +102,28 @@ static __weak ImGuiDrawView *s_activeView = nil;
     if (touch == nil) return;
 
     CGPoint point = [touch locationInView:self.metalView];
+    
+    // Cập nhật vị trí chuột cho ImGui
     ImGuiIO &io = ImGui::GetIO();
     io.MousePos = ImVec2(point.x, point.y);
 
-    switch (touch.phase) {
-        case UITouchPhaseBegan:
-        case UITouchPhaseMoved:
-        case UITouchPhaseStationary:
-            io.MouseDown[0] = true;
-            break;
-        case UITouchPhaseEnded:
-        case UITouchPhaseCancelled:
-            io.MouseDown[0] = false;
-            break;
-        default: break;
+    if (touch.phase == UITouchPhaseBegan) {
+        s_lastTouchPos = point;
+        s_lastTouchTime = CACurrentMediaTime();
+    } 
+    else if (touch.phase == UITouchPhaseEnded) {
+        CFTimeInterval duration = CACurrentMediaTime() - s_lastTouchTime;
+        CGFloat deltaX = point.x - s_lastTouchPos.x;
+        CGFloat deltaY = point.y - s_lastTouchPos.y;
+        
+        // Vuốt từ mép trái sang phải (Mở Menu)
+        if (s_lastTouchPos.x < 40 && deltaX > 100 && fabs(deltaY) < 50) {
+            UserMenu::GetInstance().isMenuOpen = true;
+        }
+        // Vuốt từ mép phải sang trái (Đóng Menu)
+        else if (s_lastTouchPos.x > SCREEN_WIDTH - 40 && deltaX < -100 && fabs(deltaY) < 50) {
+            UserMenu::GetInstance().isMenuOpen = false;
+        }
     }
 }
 
@@ -130,7 +144,6 @@ static __weak ImGuiDrawView *s_activeView = nil;
         ImGui::DestroyContext();
         self.imguiReady = NO;
     }
-    if (s_activeView == self) s_activeView = nil;
 }
 
 @end
