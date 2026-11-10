@@ -14,6 +14,7 @@ static BOOL isMenuShowing = NO;
 @implementation MenuLoad
 
 + (void)load {
+    // Đợi 3 giây cho game load xong UI rồi mới setup
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         extraInfo = [[MenuLoad alloc] init];
         [extraInfo setupMenu];
@@ -35,36 +36,44 @@ static BOOL isMenuShowing = NO;
     if (!window) return;
 
     // ==========================================
-    // TẠO NÚT TRÒN
+    // 1. TẠO IMGUI VIEW (ẨN BẰNG ALPHA)
+    // ==========================================
+    self.imguiView = [[ImGuiDrawView alloc] init];
+    UIView *imguiAsView = (UIView *)self.imguiView;
+    imguiAsView.frame = window.bounds;
+    imguiAsView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    imguiAsView.userInteractionEnabled = YES;
+    
+    // QUAN TRỌNG: Ẩn bằng alpha thay vì hidden để tránh lỗi crash khi bật lại
+    imguiAsView.alpha = 0.0f; 
+    
+    [window addSubview:imguiAsView];
+
+    // ==========================================
+    // 2. TẠO NÚT TRÒN (CON KHỈ)
     // ==========================================
     self.menuButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.menuButton.frame = CGRectMake(50, 100, 60, 60); // Kích thước 60x60
+    self.menuButton.frame = CGRectMake(50, 100, 60, 60);
     
-    // Bo tròn nút, viền trắng mờ, nền trong suốt
+    // Style: Nền trong suốt, viền trắng mờ, bo góc
     self.menuButton.layer.cornerRadius = 30.0f; 
     self.menuButton.clipsToBounds = YES;
-    self.menuButton.backgroundColor = [UIColor clearColor];
+    self.menuButton.backgroundColor = [UIColor colorWithWhite:0.0f alpha:0.2f];
     self.menuButton.layer.borderWidth = 2.0f;
     self.menuButton.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.5f].CGColor;
     
-    // --- LOAD ẢNH TỪ FILE ---
-    // Tìm đường dẫn file logo.png (không cần đuôi .png trong tên resource)
-    NSString *bundlePath = [[NSBundle mainBundle] pathForResource:@"logo" ofType:@"png"];
-    UIImage *logoImage = nil;
-    
-    if (bundlePath) {
-        logoImage = [UIImage imageWithContentsOfFile:bundlePath];
-    }
+    // Tìm ảnh trong đường dẫn Rootless
+    NSString *imagePath = @"/var/jb/Library/Application Support/34306jit/logo.png";
+    UIImage *logoImage = [UIImage imageWithContentsOfFile:imagePath];
     
     if (logoImage) {
         [self.menuButton setImage:logoImage forState:UIControlStateNormal];
     } else {
-        // Fallback nếu tìm không thấy ảnh
         [self.menuButton setTitle:@"M" forState:UIControlStateNormal];
         [self.menuButton setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
     }
-    // ------------------------------------------
 
+    // Gắn sự kiện bấm và kéo thả
     [self.menuButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [self.menuButton addGestureRecognizer:pan];
@@ -73,20 +82,15 @@ static BOOL isMenuShowing = NO;
 }
 
 - (void)toggleMenu {
-    if (!self.imguiView) {
-        UIWindow *window = self.menuButton.superview;
-        if (!window) return;
-        self.imguiView = [[ImGuiDrawView alloc] init];
-        UIView *imguiAsView = (UIView *)self.imguiView; 
-        imguiAsView.frame = window.bounds;
-        imguiAsView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        imguiAsView.userInteractionEnabled = YES;
-        imguiAsView.hidden = YES; 
-        [window addSubview:imguiAsView];
-    }
+    if (!self.imguiView) return;
+    
     isMenuShowing = !isMenuShowing;
     UIView *imguiAsView = (UIView *)self.imguiView;
-    imguiAsView.hidden = !isMenuShowing;
+    
+    // Hiệu ứng mờ dần (Fade in/out) tránh giật lag
+    [UIView animateWithDuration:0.2 animations:^{
+        imguiAsView.alpha = isMenuShowing ? 1.0f : 0.0f;
+    }];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
