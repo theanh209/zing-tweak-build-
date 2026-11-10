@@ -1,103 +1,119 @@
-#import <UIKit/UIKit.h>
+// File: MenuLoad/UserMenu.mm
+#include "UserMenu.h"
 #include "Includes.h"
-#import "ImGuiDrawView.h"
+#include "imgui.h"
+#include "imgui_internal.h"
 
-@interface MenuLoad()
-@property (nonatomic, strong) ImGuiDrawView *imguiView;
-@property (nonatomic, strong) UIButton *menuButton;
-- (ImGuiDrawView*) GetImGuiView;
-@end
+void UserMenu::RenderingMenu() {
+    if (!isMenuOpen) return; 
 
-static MenuLoad* extraInfo;
-static BOOL isMenuShowing = NO;
+    // Cấu hình Style
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.WindowRounding = 8.0f;
+    style.FrameRounding = 4.0f;
+    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.95f);
+    style.Colors[ImGuiCol_TitleBg] = ImVec4(0.12f, 0.12f, 0.12f, 1.0f);
+    style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f, 0.15f, 0.15f, 1.0f);
+    style.Colors[ImGuiCol_CheckMark] = ImVec4(0.2f, 1.0f, 0.5f, 1.0f);
 
-@implementation MenuLoad
+    ImGui::SetNextWindowSize(ImVec2(480, 580), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Zing Speed Mobile | Dev: Ng The Anh", &isMenuOpen, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
 
-+ (void)load {
-    // Chờ game load xong UI (3 giây)
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        extraInfo = [[MenuLoad alloc] init];
-        [extraInfo setupMenu];
-    });
-}
-
-- (void)setupMenu {
-    UIWindow *window = nil;
-    if (@available(iOS 13.0, *)) {
-        for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
-            if (scene.activationState == UISceneActivationStateForegroundActive) {
-                for (UIWindow *w in scene.windows) {
-                    if (w.isKeyWindow) { window = w; break; }
-                }
-            }
-        }
-    }
-    if (!window) window = [UIApplication sharedApplication].keyWindow;
-    if (!window) return;
-
-    // ==========================================
-    // 1. TẠO NÚT BẤM (ICON CON KHỈ)
-    // ==========================================
-    self.menuButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.menuButton.frame = CGRectMake(50, 100, 60, 60);
-    
-    // Style: Viền trắng, bo góc
-    self.menuButton.layer.cornerRadius = 30.0f; 
-    self.menuButton.clipsToBounds = YES;
-    self.menuButton.backgroundColor = [UIColor colorWithWhite:0.0f alpha:0.2f];
-    self.menuButton.layer.borderWidth = 2.0f;
-    self.menuButton.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.5f].CGColor;
-    
-    // Load ảnh từ Rootless Path
-    NSString *imagePath = @"/var/jb/Library/Application Support/34306jit/logo.png";
-    UIImage *logoImage = [UIImage imageWithContentsOfFile:imagePath];
-    if (logoImage) {
-        [self.menuButton setImage:logoImage forState:UIControlStateNormal];
-    } else {
-        [self.menuButton setTitle:@"M" forState:UIControlStateNormal];
-        [self.menuButton setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
-    }
-
-    // Sự kiện bấm và kéo thả
-    [self.menuButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-    [self.menuButton addGestureRecognizer:pan];
-    
-    [window addSubview:self.menuButton];
-}
-
-- (void)toggleMenu {
-    // Tạo ImGui View nếu chưa có (Lazy load, an toàn)
-    if (!self.imguiView) {
-        UIWindow *window = self.menuButton.superview;
-        if (!window) return;
+    if (ImGui::BeginTabBar("MenuTabs", ImGuiTabBarFlags_None)) {
         
-        self.imguiView = [[ImGuiDrawView alloc] init];
-        UIView *imguiAsView = (UIView *)self.imguiView; 
-        imguiAsView.frame = window.bounds;
-        imguiAsView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        imguiAsView.userInteractionEnabled = YES;
-        imguiAsView.alpha = 0.0f; // Bắt đầu ẩn
-        [window addSubview:imguiAsView];
+        // ================= TAB 1: GAME CHEATS =================
+        if (ImGui::BeginTabItem("Tinh Chinh Game")) {
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Di Chuyen & Toc Do");
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            ImGui::Columns(2, nullptr, false);
+            ImGui::Checkbox("Vo Han Nitro", &Cheats.VoHanNitro);
+            ImGui::Checkbox("Nitro Nhanh", &Cheats.NitroNhanh);
+            ImGui::Checkbox("Gia Toc", &Cheats.GiaToc);
+            ImGui::NextColumn();
+            
+            ImGui::Checkbox("Mini Boot", &Cheats.MiniBoot);
+            ImGui::Checkbox("Thoat Nhanh", &Cheats.ThoatNhanh);
+            ImGui::Columns(1);
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Teleport & Map");
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            ImGui::Columns(2, nullptr, false);
+            ImGui::Checkbox("Teleport Auto", &Cheats.TeleportAuto);
+            ImGui::Checkbox("ECU 3 Luot", &Cheats.ECU3Luot);
+            ImGui::NextColumn();
+            ImGui::Checkbox("Teleport Button", &Cheats.TeleportButton); 
+            ImGui::Checkbox("Fake Ten", &Cheats.FakeTen);
+            ImGui::Columns(1);
+
+            ImGui::EndTabItem();
+        }
+
+        // ================= TAB 2: AUTO PLAY =================
+        if (ImGui::BeginTabItem("Auto Dua")) {
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "He Thong Tu Dong");
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            ImGui::Checkbox("Auto Dua Lap Trinh", &Cheats.AutoDuaLapTrinh);
+            ImGui::Spacing();
+
+            if (ImGui::RadioButton("1. Theo duong huong dan", Cheats.AutoMode == 1)) { Cheats.AutoMode = 1; }
+            if (ImGui::RadioButton("2. Tu ra giua duong", Cheats.AutoMode == 2)) { Cheats.AutoMode = 2; }
+            
+            ImGui::EndTabItem();
+        }
+
+        // ================= TAB 3: THONG TIN & LUU Y =================
+        if (ImGui::BeginTabItem("Luu Y")) {
+            ImGui::Spacing();
+            ImGui::Checkbox("Ky Sinh", &Cheats.KySinh);
+            ImGui::Checkbox("Streamer Mode", &KTempVars.StreamerMode); 
+            
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "LUU Y QUAN TRONG:");
+            
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
+            ImGui::BeginChild("NoteBox", ImVec2(0, 150), true); 
+            
+            ImGui::TextWrapped("- Menu nay duoc phat trien boi Ng The Anh.");
+            ImGui::TextWrapped("- Vui long khong buon ban, chia se mien phi de cong dong phat trien.");
+            ImGui::TextWrapped("- Su dung menu co the dan den bi khoa tai khoan. Hay su dung co trach nhiem!");
+            ImGui::TextWrapped("- Phien ban: 34306jit v1.0.0");
+            
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+            
+            ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Lien he ho tro:");
+            ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Zalo: ");
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.5f, 1.0f), "0338442509");
+            
+            ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "Telegram: ");
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.5f, 1.0f), "@tranggnekk");
+            
+            ImGui::EndChild();
+            ImGui::PopStyleColor();
+
+            ImGui::Spacing();
+            ImGui::TextDisabled("Copyright © 2024 Ng The Anh.");
+
+            ImGui::EndTabItem();
+        }
+        
+        ImGui::EndTabBar();
     }
-    
-    isMenuShowing = !isMenuShowing;
-    UIView *imguiAsView = (UIView *)self.imguiView;
-    
-    // Bật/tắt bằng Alpha để tránh crash Metal
-    [UIView animateWithDuration:0.2 animations:^{
-        imguiAsView.alpha = isMenuShowing ? 1.0f : 0.0f;
-    }];
+    ImGui::End();
 }
-
-- (void)handlePan:(UIPanGestureRecognizer *)pan {
-    CGPoint translation = [pan translationInView:self.menuButton.superview];
-    self.menuButton.center = CGPointMake(self.menuButton.center.x + translation.x, self.menuButton.center.y + translation.y);
-    [pan setTranslation:CGPointZero inView:self.menuButton.superview];
-}
-
-- (ImGuiDrawView*) GetImGuiView {
-    return self.imguiView;
-}
-
-@end
