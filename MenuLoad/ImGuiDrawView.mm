@@ -2,8 +2,6 @@
 #import "ImGuiDrawView.h"
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
-#import <QuartzCore/QuartzCore.h>
-
 #include "../ImGui/imgui.h"
 #include "../ImGui/imgui_impl_metal.h"
 #include "UserMenu.h"
@@ -16,12 +14,10 @@
 
 @implementation ImGuiDrawView
 
-// Biến toàn cục để lưu vị trí chạm cuối cùng (dùng cho vuốt)
-static CGPoint s_lastTouchPos = {0, 0};
-static CFTimeInterval s_lastTouchTime = 0;
+static bool MenDeal = true;
 
-- (instancetype)init {
-    self = [super init];
+- (instancetype)initWithNibName:(nullable NSString *)nibNameOrNil bundle:(nullable NSBundle *)nibBundleOrNil {
+    self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil];
     if (self) { _imguiReady = NO; }
     return self;
 }
@@ -37,8 +33,6 @@ static CFTimeInterval s_lastTouchTime = 0;
     view.preferredFramesPerSecond = 60;
     view.enableSetNeedsDisplay = NO;
     view.paused = NO;
-    
-    // Bật tương tác để nhận vuốt
     view.userInteractionEnabled = YES;
     
     self.view = view;
@@ -56,7 +50,7 @@ static CFTimeInterval s_lastTouchTime = 0;
         io.DisplaySize = ImVec2(frame.size.width, frame.size.height);
         io.DisplayFramebufferScale = ImVec2(UIScreen.mainScreen.scale, UIScreen.mainScreen.scale);
 
-        // Dùng font mặc định để tránh lỗi
+        // Dùng font mặc định để tránh văng do font
         io.Fonts->AddFontDefault();
 
         ImGui_ImplMetal_Init(device);
@@ -64,8 +58,16 @@ static CFTimeInterval s_lastTouchTime = 0;
     }
 }
 
++ (void)showChange:(BOOL)open {
+    MenDeal = open;
+}
+
++ (BOOL)isMenuShowing {
+    return MenDeal;
+}
+
 - (void)drawInMTKView:(MTKView *)view {
-    if (!self.imguiReady) return;
+    if (!self.imguiReady || !MenDeal) return;
 
     MTLRenderPassDescriptor *pass = view.currentRenderPassDescriptor;
     id<CAMetalDrawable> drawable = view.currentDrawable;
@@ -80,7 +82,7 @@ static CFTimeInterval s_lastTouchTime = 0;
     io.DisplayFramebufferScale = ImVec2(view.contentScaleFactor, view.contentScaleFactor);
 
     ImGui::NewFrame();
-    UserMenu::GetInstance().RenderingMenu(); // Gọi hàm vẽ Menu
+    UserMenu::GetInstance().RenderingMenu(); // Vẽ Menu
     ImGui::Render();
 
     id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:pass];
@@ -94,7 +96,7 @@ static CFTimeInterval s_lastTouchTime = 0;
 }
 
 // ==========================================
-// XỬ LÝ VUỐT (Bật/tắt Menu thay cho nút bấm)
+// XỬ LÝ TOUCH
 // ==========================================
 - (void)updateIOWithTouchEvent:(UIEvent *)event {
     if (!self.imguiReady) return;
@@ -102,28 +104,20 @@ static CFTimeInterval s_lastTouchTime = 0;
     if (touch == nil) return;
 
     CGPoint point = [touch locationInView:self.metalView];
-    
-    // Cập nhật vị trí chuột cho ImGui
     ImGuiIO &io = ImGui::GetIO();
     io.MousePos = ImVec2(point.x, point.y);
 
-    if (touch.phase == UITouchPhaseBegan) {
-        s_lastTouchPos = point;
-        s_lastTouchTime = CACurrentMediaTime();
-    } 
-    else if (touch.phase == UITouchPhaseEnded) {
-        CFTimeInterval duration = CACurrentMediaTime() - s_lastTouchTime;
-        CGFloat deltaX = point.x - s_lastTouchPos.x;
-        CGFloat deltaY = point.y - s_lastTouchPos.y;
-        
-        // Vuốt từ mép trái sang phải (Mở Menu)
-        if (s_lastTouchPos.x < 40 && deltaX > 100 && fabs(deltaY) < 50) {
-            UserMenu::GetInstance().isMenuOpen = true;
-        }
-        // Vuốt từ mép phải sang trái (Đóng Menu)
-        else if (s_lastTouchPos.x > SCREEN_WIDTH - 40 && deltaX < -100 && fabs(deltaY) < 50) {
-            UserMenu::GetInstance().isMenuOpen = false;
-        }
+    switch (touch.phase) {
+        case UITouchPhaseBegan:
+        case UITouchPhaseMoved:
+        case UITouchPhaseStationary:
+            io.MouseDown[0] = true;
+            break;
+        case UITouchPhaseEnded:
+        case UITouchPhaseCancelled:
+            io.MouseDown[0] = false;
+            break;
+        default: break;
     }
 }
 
@@ -145,5 +139,23 @@ static CFTimeInterval s_lastTouchTime = 0;
         self.imguiReady = NO;
     }
 }
+
+// ==========================================
+// MẤY CÁI HÀM HOOK CỦA MÀY (Bỏ comment để xài)
+// ==========================================
+/*
+- (void)setupHooks {
+    // HOOK(ENCRYPTOFFSET("0x61E0F48"), _cam, cam); 
+    // HOOK(ENCRYPTOFFSET("0x61DFF50"), _Update, Update); 
+    // HOOK(ENCRYPTOFFSET("0x61E1370"), _highrate, highrate); 
+    // HOOK(ENCRYPTOFFSET("0x59EC6F4"), IsSmartUse, _IsSmartUse); 
+    // HOOK(ENCRYPTOFFSET("0x57CC0F4"), get_IsUseCameraMoveWithIndicator, _get_IsUseCameraMoveWithIndicator); 
+    // HOOK(ENCRYPTOFFSET("0x64C773C"), IsDistanceLowerEqualAsAttacker, old_IsDistanceLowerEqualAsAttacker); 
+    // HOOK(ENCRYPTOFFSET("0x5AD7B84"), IsUseSkillJoystick, _IsUseSkillJoystick); 
+    // HOOK(ENCRYPTOFFSET("0x5A6A764"), SetPlayerName, old_SetPlayerName); 
+    // HOOK(ENCRYPTOFFSET("0x547FB70"), _Autowin, Autowin); 
+    // HOOK(ENCRYPTOFFSET("0x53AC920"), LActorRoot_Visible, _LActorRoot_Visible); 
+}
+*/
 
 @end
