@@ -14,7 +14,7 @@ $(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation Security QuartzCore CoreGraphics Cor
 $(TWEAK_NAME)_CCFLAGS = -std=c++17 -fno-rtti -DNDEBUG -Wall -Wno-deprecated-declarations -Wno-unused-variable -Wno-unused-value -Wno-unused-function -Wno-writable-strings -Wno-error -Wno-nontrivial-memcall -I./ImGui -I.
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc -Wall -Wno-deprecated-declarations -Wno-unused-variable -Wno-unused-value -Wno-unused-function -Wno-error
 
-# Quét toàn bộ file (bao gồm cả .xm và .mm)
+# Tự động quét TẤT CẢ file .mm và .xm trong MenuLoad và ImGui
 $(TWEAK_NAME)_FILES = $(wildcard MenuLoad/*.mm) \
                       $(wildcard MenuLoad/*.xm) \
                       $(wildcard Source/*.mm) \
