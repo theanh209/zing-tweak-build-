@@ -1,146 +1,124 @@
-// File: MenuLoad/ImGuiDrawView.mm
-#import "ImGuiDrawView.h"
-#import <Metal/Metal.h>
-#import <MetalKit/MetalKit.h>
-#include "../ImGui/imgui.h"
-#include "../ImGui/imgui_impl_metal.h"
-#include "UserMenu.h"
+// File: Source/BasicHacks.mm 
+#import "BasicHacks.h"
+#include "../MenuLoad/Includes.h"
+#include "../utils/KPatch.hpp" 
+#include <chrono>
+#include <thread>
+#include <cmath>
+#include <mach-o/dyld.h>
+#include <string.h>
 
-@interface ImGuiDrawView () <MTKViewDelegate>
-@property (nonatomic, strong) MTKView *metalView;
-@property (nonatomic, strong) id<MTLCommandQueue> commandQueue;
-@property (nonatomic, assign) BOOL imguiReady;
+namespace offsets {
+    constexpr uintptr_t OFFSET_GWorld                   = 0x0000000; 
+    constexpr uintptr_t OFFSET_OwningGameInstance       = 0x0000000; 
+    constexpr uintptr_t OFFSET_LocalPlayers             = 0x0000000; 
+    constexpr uintptr_t OFFSET_LocalPlayerController    = 0x0000000; 
+    constexpr uintptr_t OFFSET_Kart                     = 0x0000000; 
+    constexpr uintptr_t OFFSET_VoHanNitro               = 0x0000000; 
+    constexpr uintptr_t OFFSET_GiaToc                   = 0x0000000; 
+    constexpr uintptr_t OFFSET_HP                       = 0x0000000; 
+    constexpr uintptr_t OFFSET_Kart_Position            = 0x0000000; 
+    constexpr uintptr_t OFFSET_Kart_Yaw                 = 0x0000000; 
+}
+
+struct Vec3 { float x, y, z; };
+CheatVars Cheats; 
+
+uintptr_t GetUnityBase() {
+    uint32_t count = _dyld_image_count();
+    for (uint32_t i = 0; i < count; i++) {
+        const char *name = _dyld_get_image_name(i);
+        if (name && strstr(name, "UnityFramework")) {
+            return _dyld_get_image_vmaddr_slide(i);
+        }
+    }
+    return 0;
+}
+
+static float CalcTargetYaw(const Vec3& from, const Vec3& to) {
+    return atan2f(to.x - from.x, to.z - from.z) * (180.0f / 3.14159265f);
+}
+static float NormalizeAngle(float ang) {
+    while (ang > 180.0f) ang -= 360.0f;
+    while (ang < -180.0f) ang += 360.0f;
+    return ang;
+}
+
+void BasicHacks::HacksThread() {
+    using namespace offsets;
+
+    if (OFFSET_GWorld == 0) return; 
+
+    static uintptr_t BaseAddr = GetUnityBase();
+    if (!BaseAddr) return;
+
+    static uintptr_t GWorld = 0;
+    if (GWorld == 0) {
+        GWorld = KomaruPatch::ReadMem<uintptr_t>(BaseAddr + OFFSET_GWorld);
+    }
+    if(!GWorld) return;
+
+    uintptr_t OwningGameInstance = KomaruPatch::ReadMem<uintptr_t>(GWorld + OFFSET_OwningGameInstance);
+    if(!OwningGameInstance) return;
+
+    uintptr_t LocalPlayers = KomaruPatch::ReadMem<uintptr_t>(OwningGameInstance + OFFSET_LocalPlayers);
+    if(!LocalPlayers) return;
+
+    uintptr_t LocalPlayer = KomaruPatch::ReadMem<uintptr_t>(LocalPlayers);
+    if(!LocalPlayer) return;
+
+    uintptr_t LocalPlayerController = KomaruPatch::ReadMem<uintptr_t>(LocalPlayer + OFFSET_LocalPlayerController);
+    if(!LocalPlayerController) return;
+
+    uintptr_t Kart = KomaruPatch::ReadMem<uintptr_t>(LocalPlayerController + OFFSET_Kart);
+    if(!Kart) return;
+
+    if (Cheats.VoHanNitro && OFFSET_VoHanNitro != 0) {
+        KomaruPatch::WriteMem<float>(Kart + OFFSET_VoHanNitro, 3.0f); 
+    }
+    if (Cheats.GiaToc && OFFSET_GiaToc != 0) {
+        KomaruPatch::WriteMem<float>(Kart + OFFSET_GiaToc, 105.0f);
+    }
+    if (Cheats.KySinh && OFFSET_HP != 0) {
+        KomaruPatch::WriteMem<float>(Kart + OFFSET_HP, 100.0f); 
+    }
+
+    if (Cheats.AutoDuaLapTrinh && OFFSET_Kart_Position != 0 && OFFSET_Kart_Yaw != 0) {
+        Vec3 pos = KomaruPatch::ReadMem<Vec3>(Kart + OFFSET_Kart_Position);
+        float current_yaw = KomaruPatch::ReadMem<float>(Kart + OFFSET_Kart_Yaw);
+        static Vec3 target_waypoint = { 100.0f, 0.0f, 200.0f }; 
+        
+        if (pos.x != 0.0f || pos.y != 0.0f) {
+            float target_yaw = CalcTargetYaw(pos, target_waypoint);
+            float delta_yaw = NormalizeAngle(target_yaw - current_yaw);
+            if (Cheats.AutoMode == 1) {
+                KomaruPatch::WriteMem<float>(Kart + OFFSET_Kart_Yaw, current_yaw + (delta_yaw * 0.15f));
+            } else if (Cheats.AutoMode == 2) {
+                KomaruPatch::WriteMem<float>(Kart + OFFSET_Kart_Yaw, current_yaw + (delta_yaw * 0.45f));
+            }
+        }
+    }
+}
+
+@implementation GameLoop {
+    dispatch_source_t _timer;
+}
+- (void)start {
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    _timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+    if (_timer) {
+        NSTimeInterval interval = 1.0 / 60.0; 
+        dispatch_source_set_timer(_timer, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(interval * NSEC_PER_SEC)), (uint64_t)(interval * NSEC_PER_SEC), 0);
+        dispatch_source_set_event_handler(_timer, ^{ BasicHacks::HacksThread(); });
+        dispatch_resume(_timer);
+    }
+}
+- (void)stop {
+    if (_timer) { dispatch_source_cancel(_timer); }
+}
 @end
 
-@implementation ImGuiDrawView
-
-static bool MenDeal = true;
-
-- (instancetype)initWithNibName:(nullable NSString *)nibNameOrNil bundle:(nullable NSBundle *)nibBundleOrNil {
-    self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil];
-    if (self) { _imguiReady = NO; }
-    return self;
+void BasicHacks::Initialize(){
+    static GameLoop *gameLoop = [[GameLoop alloc] init];
+    [gameLoop start];
 }
-
-- (void)loadView {
-    CGRect frame = UIScreen.mainScreen.bounds;
-    MTKView *view = [[MTKView alloc] initWithFrame:frame];
-    view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    view.backgroundColor = UIColor.clearColor;
-    view.opaque = NO;
-    view.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 0.0);
-    view.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
-    view.preferredFramesPerSecond = 60;
-    
-    // FIX: Mặc định dừng vẽ để không tranh chấp với game
-    view.enableSetNeedsDisplay = YES; 
-    view.paused = YES; 
-    
-    view.userInteractionEnabled = YES;
-    
-    self.view = view;
-    self.metalView = view;
-    view.delegate = self;
-
-    id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-    view.device = device;
-    self.commandQueue = [device newCommandQueue];
-
-    if (device != nil && self.commandQueue != nil) {
-        ImGui::CreateContext();
-        ImGuiIO &io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        io.DisplaySize = ImVec2(frame.size.width, frame.size.height);
-        io.DisplayFramebufferScale = ImVec2(UIScreen.mainScreen.scale, UIScreen.mainScreen.scale);
-        io.Fonts->AddFontDefault();
-
-        ImGui_ImplMetal_Init(device);
-        self.imguiReady = YES;
-    }
-}
-
-+ (void)showChange:(BOOL)open {
-    MenDeal = open;
-}
-
-+ (BOOL)isMenuShowing {
-    return MenDeal;
-}
-
-- (void)drawInMTKView:(MTKView *)view {
-    // FIX: Nếu menu đóng thì không vẽ
-    if (!self.imguiReady || !MenDeal) return;
-
-    MTLRenderPassDescriptor *pass = view.currentRenderPassDescriptor;
-    id<CAMetalDrawable> drawable = view.currentDrawable;
-    if (pass == nil || drawable == nil) return;
-
-    id<MTLCommandBuffer> commandBuffer = [self.commandQueue commandBuffer];
-    if (commandBuffer == nil) return;
-
-    ImGui_ImplMetal_NewFrame(pass);
-    ImGuiIO &io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(view.bounds.size.width, view.bounds.size.height);
-    io.DisplayFramebufferScale = ImVec2(view.contentScaleFactor, view.contentScaleFactor);
-
-    ImGui::NewFrame();
-    UserMenu::GetInstance().RenderingMenu();
-    ImGui::Render();
-
-    id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:pass];
-    if (encoder != nil) {
-        ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), commandBuffer, encoder);
-        [encoder endEncoding];
-    }
-
-    [commandBuffer presentDrawable:drawable];
-    [commandBuffer commit];
-}
-
-// ==========================================
-// XỬ LÝ TOUCH (CHỈ NHẬN KHI MENU MỞ)
-// ==========================================
-- (void)updateIOWithTouchEvent:(UIEvent *)event {
-    if (!self.imguiReady || !MenDeal) return; // FIX: Menu đóng thì bỏ qua touch
-    UITouch *touch = event.allTouches.anyObject;
-    if (touch == nil) return;
-
-    CGPoint point = [touch locationInView:self.metalView];
-    ImGuiIO &io = ImGui::GetIO();
-    io.MousePos = ImVec2(point.x, point.y);
-
-    switch (touch.phase) {
-        case UITouchPhaseBegan:
-        case UITouchPhaseMoved:
-        case UITouchPhaseStationary:
-            io.MouseDown[0] = true;
-            break;
-        case UITouchPhaseEnded:
-        case UITouchPhaseCancelled:
-            io.MouseDown[0] = false;
-            break;
-        default: break;
-    }
-}
-
-// Các hàm này chỉ được gọi khi view này hiển thị và nhận touch
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
-- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
-- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
-
-- (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {
-    if (!self.imguiReady) return;
-    ImGuiIO &io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(size.width / view.contentScaleFactor, size.height / view.contentScaleFactor);
-}
-
-- (void)dealloc {
-    if (self.imguiReady) {
-        ImGui_ImplMetal_Shutdown();
-        ImGui::DestroyContext();
-        self.imguiReady = NO;
-    }
-}
-
-@end
