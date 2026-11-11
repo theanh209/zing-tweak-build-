@@ -5,6 +5,7 @@
 
 @interface MenuLoad()
 @property (nonatomic, strong) ImGuiDrawView *imguiView;
+@property (nonatomic, strong) UIButton *menuButton;
 @end
 
 static MenuLoad* extraInfo;
@@ -15,7 +16,7 @@ static BOOL isMenuShowing = NO;
 + (void)load {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         extraInfo = [[MenuLoad alloc] init];
-        [extraInfo setupGesture];
+        [extraInfo setupMenuButton];
     });
 }
 
@@ -33,26 +34,35 @@ static BOOL isMenuShowing = NO;
     return [UIApplication sharedApplication].keyWindow;
 }
 
-- (void)setupGesture {
+- (void)setupMenuButton {
     UIWindow *window = [self getActiveWindow];
     if (!window) return;
 
-    // Vuốt 3 ngón tay từ trái sang phải để MỞ menu
-    UISwipeGestureRecognizer *swipeRight = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(toggleMenu)];
-    swipeRight.numberOfTouchesRequired = 3;
-    swipeRight.direction = UISwipeGestureRecognizerDirectionRight;
+    // Tạo nút Menu (giống hệt cái cũ của mày)
+    self.menuButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.menuButton.frame = CGRectMake(50, 100, 60, 60);
+    self.menuButton.layer.cornerRadius = 30.0f; 
+    self.menuButton.clipsToBounds = YES;
+    self.menuButton.backgroundColor = [UIColor colorWithWhite:0.0f alpha:0.3f];
+    self.menuButton.layer.borderWidth = 2.0f;
+    self.menuButton.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.6f].CGColor;
     
-    // Vuốt 3 ngón tay từ phải sang trái để ĐÓNG menu
-    UISwipeGestureRecognizer *swipeLeft = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(toggleMenu)];
-    swipeLeft.numberOfTouchesRequired = 3;
-    swipeLeft.direction = UISwipeGestureRecognizerDirectionLeft;
+    [self.menuButton setTitle:@"Menu" forState:UIControlStateNormal];
+    [self.menuButton setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
+    self.menuButton.titleLabel.font = [UIFont boldSystemFontOfSize:14.0f];
 
-    [window addGestureRecognizer:swipeRight];
-    [window addGestureRecognizer:swipeLeft];
+    [self.menuButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
+    
+    // Thêm tính năng kéo thả nút đi chỗ khác
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+    [self.menuButton addGestureRecognizer:pan];
+    
+    [window addSubview:self.menuButton];
 }
 
 - (void)toggleMenu {
     dispatch_async(dispatch_get_main_queue(), ^{
+        // 1. Khởi tạo ImGuiView nếu chưa có (Chỉ khởi tạo 1 lần)
         if (!self.imguiView) {
             UIWindow *window = [self getActiveWindow];
             if (!window) return;
@@ -66,20 +76,21 @@ static BOOL isMenuShowing = NO;
             [window addSubview:imguiAsView];
         }
         
+        // 2. Bật/tắt trạng thái
         isMenuShowing = !isMenuShowing;
         UIView *imguiAsView = (UIView *)self.imguiView;
         imguiAsView.hidden = !isMenuShowing;
         
-        // FIX: Đồng bộ trạng thái với ImGui
+        // 3. Đồng bộ trạng thái với ImGui và bật/tắt render
         [ImGuiDrawView showChange:isMenuShowing];
-        
-        // FIX: Bật/tắt vòng lặp render của Metal
-        if (isMenuShowing) {
-            self.imguiView.metalView.paused = NO;
-        } else {
-            self.imguiView.metalView.paused = YES;
-        }
+        [self.imguiView setRenderingPaused:!isMenuShowing];
     });
+}
+
+- (void)handlePan:(UIPanGestureRecognizer *)pan {
+    CGPoint translation = [pan translationInView:self.menuButton.superview];
+    self.menuButton.center = CGPointMake(self.menuButton.center.x + translation.x, self.menuButton.center.y + translation.y);
+    [pan setTranslation:CGPointZero inView:self.menuButton.superview];
 }
 
 @end
