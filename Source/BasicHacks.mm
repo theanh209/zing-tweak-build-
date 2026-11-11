@@ -9,7 +9,6 @@
 #include <string.h>
 
 namespace offsets {
-    // Để 0x0, không đọc bộ nhớ khi chưa có offset
     constexpr uintptr_t OFFSET_GWorld                   = 0x0000000; 
     constexpr uintptr_t OFFSET_OwningGameInstance       = 0x0000000; 
     constexpr uintptr_t OFFSET_LocalPlayers             = 0x0000000; 
@@ -47,8 +46,6 @@ static float NormalizeAngle(float ang) {
 
 void BasicHacks::HacksThread() {
     using namespace offsets;
-
-    // CHẶN VĂNG: Nếu chưa có offset thì dừng luôn
     if (OFFSET_GWorld == 0) return; 
 
     static uintptr_t BaseAddr = GetUnityBase();
