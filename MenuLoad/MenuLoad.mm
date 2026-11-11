@@ -38,7 +38,6 @@ static BOOL isMenuShowing = NO;
     UIWindow *window = [self getActiveWindow];
     if (!window) return;
 
-    // Tạo nút Menu (giống hệt cái cũ của mày)
     self.menuButton = [UIButton buttonWithType:UIButtonTypeCustom];
     self.menuButton.frame = CGRectMake(50, 100, 60, 60);
     self.menuButton.layer.cornerRadius = 30.0f; 
@@ -53,7 +52,6 @@ static BOOL isMenuShowing = NO;
 
     [self.menuButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
     
-    // Thêm tính năng kéo thả nút đi chỗ khác
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [self.menuButton addGestureRecognizer:pan];
     
@@ -62,7 +60,6 @@ static BOOL isMenuShowing = NO;
 
 - (void)toggleMenu {
     dispatch_async(dispatch_get_main_queue(), ^{
-        // 1. Khởi tạo ImGuiView nếu chưa có (Chỉ khởi tạo 1 lần)
         if (!self.imguiView) {
             UIWindow *window = [self getActiveWindow];
             if (!window) return;
@@ -76,12 +73,10 @@ static BOOL isMenuShowing = NO;
             [window addSubview:imguiAsView];
         }
         
-        // 2. Bật/tắt trạng thái
         isMenuShowing = !isMenuShowing;
         UIView *imguiAsView = (UIView *)self.imguiView;
         imguiAsView.hidden = !isMenuShowing;
         
-        // 3. Đồng bộ trạng thái với ImGui và bật/tắt render
         [ImGuiDrawView showChange:isMenuShowing];
         [self.imguiView setRenderingPaused:!isMenuShowing];
     });
