@@ -1,91 +1,146 @@
-// File: MenuLoad/MenuLoad.mm
-#import <UIKit/UIKit.h>
-#include "Includes.h"
+// File: MenuLoad/ImGuiDrawView.mm
 #import "ImGuiDrawView.h"
+#import <Metal/Metal.h>
+#import <MetalKit/MetalKit.h>
+#include "../ImGui/imgui.h"
+#include "../ImGui/imgui_impl_metal.h"
+#include "UserMenu.h"
 
-@interface MenuLoad()
-@property (nonatomic, strong) ImGuiDrawView *imguiView;
-@property (nonatomic, strong) UIButton *menuButton;
+@interface ImGuiDrawView () <MTKViewDelegate>
+@property (nonatomic, strong) MTKView *metalView;
+@property (nonatomic, strong) id<MTLCommandQueue> commandQueue;
+@property (nonatomic, assign) BOOL imguiReady;
 @end
 
-static MenuLoad* extraInfo;
-static BOOL isMenuShowing = NO;
+@implementation ImGuiDrawView
 
-@implementation MenuLoad
+static bool MenDeal = true;
 
-+ (void)load {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        extraInfo = [[MenuLoad alloc] init];
-        [extraInfo setupMenuButton];
-    });
+- (instancetype)initWithNibName:(nullable NSString *)nibNameOrNil bundle:(nullable NSBundle *)nibBundleOrNil {
+    self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil];
+    if (self) { _imguiReady = NO; }
+    return self;
 }
 
-- (UIWindow *)getActiveWindow {
-    if (@available(iOS 13.0, *)) {
-        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
-            if (scene.activationState == UISceneActivationStateForegroundActive && [scene isKindOfClass:[UIWindowScene class]]) {
-                UIWindowScene *windowScene = (UIWindowScene *)scene;
-                for (UIWindow *window in windowScene.windows) {
-                    if (window.isKeyWindow) return window;
-                }
-            }
-        }
+- (void)loadView {
+    CGRect frame = UIScreen.mainScreen.bounds;
+    MTKView *view = [[MTKView alloc] initWithFrame:frame];
+    view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    view.backgroundColor = UIColor.clearColor;
+    view.opaque = NO;
+    view.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 0.0);
+    view.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
+    view.preferredFramesPerSecond = 60;
+    view.enableSetNeedsDisplay = NO;
+    view.paused = NO;
+    view.userInteractionEnabled = YES;
+    
+    self.view = view;
+    self.metalView = view;
+    view.delegate = self;
+
+    id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+    view.device = device;
+    self.commandQueue = [device newCommandQueue];
+
+    if (device != nil && self.commandQueue != nil) {
+        ImGui::CreateContext();
+        ImGuiIO &io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.DisplaySize = ImVec2(frame.size.width, frame.size.height);
+        io.DisplayFramebufferScale = ImVec2(UIScreen.mainScreen.scale, UIScreen.mainScreen.scale);
+
+        io.Fonts->AddFontDefault();
+
+        ImGui_ImplMetal_Init(device);
+        self.imguiReady = YES;
     }
-    return [UIApplication sharedApplication].keyWindow;
 }
 
-- (void)setupMenuButton {
-    UIWindow *window = [self getActiveWindow];
-    if (!window) return;
-
-    self.menuButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.menuButton.frame = CGRectMake(50, 100, 60, 60);
-    self.menuButton.layer.cornerRadius = 30.0f; 
-    self.menuButton.clipsToBounds = YES;
-    self.menuButton.backgroundColor = [UIColor colorWithWhite:0.0f alpha:0.3f];
-    self.menuButton.layer.borderWidth = 2.0f;
-    self.menuButton.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.6f].CGColor;
-    
-    [self.menuButton setTitle:@"Menu" forState:UIControlStateNormal];
-    [self.menuButton setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
-    self.menuButton.titleLabel.font = [UIFont boldSystemFontOfSize:14.0f];
-
-    [self.menuButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
-    
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
-    [self.menuButton addGestureRecognizer:pan];
-    
-    [window addSubview:self.menuButton];
++ (void)showChange:(BOOL)open {
+    MenDeal = open;
 }
 
-- (void)toggleMenu {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (!self.imguiView) {
-            UIWindow *window = [self getActiveWindow];
-            if (!window) return;
-            
-            self.imguiView = [[ImGuiDrawView alloc] init];
-            UIView *imguiAsView = (UIView *)self.imguiView; 
-            imguiAsView.frame = window.bounds;
-            imguiAsView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-            imguiAsView.userInteractionEnabled = YES;
-            imguiAsView.hidden = YES; 
-            [window addSubview:imguiAsView];
-        }
-        
-        isMenuShowing = !isMenuShowing;
-        UIView *imguiAsView = (UIView *)self.imguiView;
-        imguiAsView.hidden = !isMenuShowing;
-        
-        [ImGuiDrawView showChange:isMenuShowing];
-        [self.imguiView setRenderingPaused:!isMenuShowing];
-    });
++ (BOOL)isMenuShowing {
+    return MenDeal;
 }
 
-- (void)handlePan:(UIPanGestureRecognizer *)pan {
-    CGPoint translation = [pan translationInView:self.menuButton.superview];
-    self.menuButton.center = CGPointMake(self.menuButton.center.x + translation.x, self.menuButton.center.y + translation.y);
-    [pan setTranslation:CGPointZero inView:self.menuButton.superview];
+// HÀM FIX ĐỂ FILE MENULOAD GỌI ĐƯỢC
+- (void)setRenderingPaused:(BOOL)paused {
+    if (self.metalView) {
+        self.metalView.paused = paused;
+    }
+}
+
+- (void)drawInMTKView:(MTKView *)view {
+    if (!self.imguiReady || !MenDeal) return;
+
+    MTLRenderPassDescriptor *pass = view.currentRenderPassDescriptor;
+    id<CAMetalDrawable> drawable = view.currentDrawable;
+    if (pass == nil || drawable == nil) return;
+
+    id<MTLCommandBuffer> commandBuffer = [self.commandQueue commandBuffer];
+    if (commandBuffer == nil) return;
+
+    ImGui_ImplMetal_NewFrame(pass);
+    ImGuiIO &io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(view.bounds.size.width, view.bounds.size.height);
+    io.DisplayFramebufferScale = ImVec2(view.contentScaleFactor, view.contentScaleFactor);
+
+    ImGui::NewFrame();
+    UserMenu::GetInstance().RenderingMenu();
+    ImGui::Render();
+
+    id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:pass];
+    if (encoder != nil) {
+        ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), commandBuffer, encoder);
+        [encoder endEncoding];
+    }
+
+    [commandBuffer presentDrawable:drawable];
+    [commandBuffer commit];
+}
+
+- (void)updateIOWithTouchEvent:(UIEvent *)event {
+    if (!self.imguiReady) return;
+    UITouch *touch = event.allTouches.anyObject;
+    if (touch == nil) return;
+
+    CGPoint point = [touch locationInView:self.metalView];
+    ImGuiIO &io = ImGui::GetIO();
+    io.MousePos = ImVec2(point.x, point.y);
+
+    switch (touch.phase) {
+        case UITouchPhaseBegan:
+        case UITouchPhaseMoved:
+        case UITouchPhaseStationary:
+            io.MouseDown[0] = true;
+            break;
+        case UITouchPhaseEnded:
+        case UITouchPhaseCancelled:
+            io.MouseDown[0] = false;
+            break;
+        default: break;
+    }
+}
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
+- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
+
+- (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {
+    if (!self.imguiReady) return;
+    ImGuiIO &io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(size.width / view.contentScaleFactor, size.height / view.contentScaleFactor);
+}
+
+- (void)dealloc {
+    if (self.imguiReady) {
+        ImGui_ImplMetal_Shutdown();
+        ImGui::DestroyContext();
+        self.imguiReady = NO;
+    }
 }
 
 @end
