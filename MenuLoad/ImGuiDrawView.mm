@@ -65,7 +65,6 @@ static bool MenDeal = true;
     return MenDeal;
 }
 
-// HÀM FIX ĐỂ FILE MENULOAD GỌI ĐƯỢC
 - (void)setRenderingPaused:(BOOL)paused {
     if (self.metalView) {
         self.metalView.paused = paused;
@@ -88,7 +87,7 @@ static bool MenDeal = true;
     io.DisplayFramebufferScale = ImVec2(view.contentScaleFactor, view.contentScaleFactor);
 
     ImGui::NewFrame();
-    UserMenu::GetInstance().RenderingMenu();
+    UserMenu::GetInstance().RenderingMenu(); // Gọi hàm vẽ Menu từ file UserMenu.mm
     ImGui::Render();
 
     id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:pass];
@@ -101,6 +100,9 @@ static bool MenDeal = true;
     [commandBuffer commit];
 }
 
+// ==========================================
+// XỬ LÝ CẢM ỨNG (TOUCH)
+// ==========================================
 - (void)updateIOWithTouchEvent:(UIEvent *)event {
     if (!self.imguiReady) return;
     UITouch *touch = event.allTouches.anyObject;
