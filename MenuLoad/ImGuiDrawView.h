@@ -5,10 +5,8 @@ By aq9
 https://github.com/VenerableCode/iOS-Theos-ModMenuTemp-NoJB
 */
 
-
 #import <UIKit/UIKit.h>
 NS_ASSUME_NONNULL_BEGIN
-
 
 @interface ImGuiDrawView : UIViewController
 
@@ -16,6 +14,8 @@ NS_ASSUME_NONNULL_BEGIN
 + (BOOL)isMenuShowing;
 - (void)updateIOWithTouchEvent:(UIEvent *)event;
 
+// THÊM DÒNG NÀY ĐỂ FIX LỖI BUILD
+- (void)setRenderingPaused:(BOOL)paused;
 
 @end
 
