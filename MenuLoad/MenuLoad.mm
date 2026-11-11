@@ -14,15 +14,30 @@ static BOOL isMenuShowing = NO;
 @implementation MenuLoad
 
 + (void)load {
+    // Đợi 3 giây để game load xong UI rồi mới gắn nút
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         extraInfo = [[MenuLoad alloc] init];
         [extraInfo setupMenu];
     });
 }
 
+// Hàm lấy Window chuẩn nhất cho iOS 15+
+- (UIWindow *)getActiveWindow {
+    if (@available(iOS 13.0, *)) {
+        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if (scene.activationState == UISceneActivationStateForegroundActive && [scene isKindOfClass:[UIWindowScene class]]) {
+                UIWindowScene *windowScene = (UIWindowScene *)scene;
+                for (UIWindow *window in windowScene.windows) {
+                    if (window.isKeyWindow) return window;
+                }
+            }
+        }
+    }
+    return [UIApplication sharedApplication].keyWindow;
+}
+
 - (void)setupMenu {
-    UIWindow *window = [UIApplication sharedApplication].keyWindow;
-    if (!window) window = [UIApplication sharedApplication].windows.firstObject;
+    UIWindow *window = [self getActiveWindow];
     if (!window) return;
 
     // Tạo nút Menu
@@ -39,6 +54,8 @@ static BOOL isMenuShowing = NO;
     self.menuButton.titleLabel.font = [UIFont boldSystemFontOfSize:14.0f];
 
     [self.menuButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
+    
+    // Thêm tính năng kéo thả nút
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [self.menuButton addGestureRecognizer:pan];
     
@@ -47,8 +64,9 @@ static BOOL isMenuShowing = NO;
 
 - (void)toggleMenu {
     dispatch_async(dispatch_get_main_queue(), ^{
+        // Khởi tạo ImGuiView nếu chưa có
         if (!self.imguiView) {
-            UIWindow *window = self.menuButton.superview;
+            UIWindow *window = [self getActiveWindow];
             if (!window) return;
             
             self.imguiView = [[ImGuiDrawView alloc] init];
@@ -60,6 +78,7 @@ static BOOL isMenuShowing = NO;
             [window addSubview:imguiAsView];
         }
         
+        // Bật/tắt menu
         isMenuShowing = !isMenuShowing;
         UIView *imguiAsView = (UIView *)self.imguiView;
         imguiAsView.hidden = !isMenuShowing;
