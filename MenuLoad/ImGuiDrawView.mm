@@ -32,7 +32,9 @@ static bool MenDeal = true;
     view.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
     view.preferredFramesPerSecond = 60;
     view.enableSetNeedsDisplay = NO;
-    view.paused = NO;
+    
+    // FIX 1: Mặc định dừng vẽ để không tranh chấp với Unity
+    view.paused = YES; 
     view.userInteractionEnabled = YES;
     
     self.view = view;
@@ -87,7 +89,7 @@ static bool MenDeal = true;
     io.DisplayFramebufferScale = ImVec2(view.contentScaleFactor, view.contentScaleFactor);
 
     ImGui::NewFrame();
-    UserMenu::GetInstance().RenderingMenu(); // Gọi hàm vẽ Menu từ file UserMenu.mm
+    UserMenu::GetInstance().RenderingMenu();
     ImGui::Render();
 
     id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:pass];
@@ -100,9 +102,6 @@ static bool MenDeal = true;
     [commandBuffer commit];
 }
 
-// ==========================================
-// XỬ LÝ CẢM ỨNG (TOUCH)
-// ==========================================
 - (void)updateIOWithTouchEvent:(UIEvent *)event {
     if (!self.imguiReady) return;
     UITouch *touch = event.allTouches.anyObject;
