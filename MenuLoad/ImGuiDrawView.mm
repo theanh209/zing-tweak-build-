@@ -31,8 +31,11 @@ static bool MenDeal = true;
     view.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 0.0);
     view.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
     view.preferredFramesPerSecond = 60;
-    view.enableSetNeedsDisplay = NO;
-    view.paused = NO;
+    
+    // FIX: Mặc định dừng vẽ để không tranh chấp với game
+    view.enableSetNeedsDisplay = YES; 
+    view.paused = YES; 
+    
     view.userInteractionEnabled = YES;
     
     self.view = view;
@@ -49,8 +52,6 @@ static bool MenDeal = true;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.DisplaySize = ImVec2(frame.size.width, frame.size.height);
         io.DisplayFramebufferScale = ImVec2(UIScreen.mainScreen.scale, UIScreen.mainScreen.scale);
-
-        // Dùng font mặc định để tránh văng do font
         io.Fonts->AddFontDefault();
 
         ImGui_ImplMetal_Init(device);
@@ -67,6 +68,7 @@ static bool MenDeal = true;
 }
 
 - (void)drawInMTKView:(MTKView *)view {
+    // FIX: Nếu menu đóng thì không vẽ
     if (!self.imguiReady || !MenDeal) return;
 
     MTLRenderPassDescriptor *pass = view.currentRenderPassDescriptor;
@@ -82,7 +84,7 @@ static bool MenDeal = true;
     io.DisplayFramebufferScale = ImVec2(view.contentScaleFactor, view.contentScaleFactor);
 
     ImGui::NewFrame();
-    UserMenu::GetInstance().RenderingMenu(); // Vẽ Menu
+    UserMenu::GetInstance().RenderingMenu();
     ImGui::Render();
 
     id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:pass];
@@ -96,10 +98,10 @@ static bool MenDeal = true;
 }
 
 // ==========================================
-// XỬ LÝ TOUCH
+// XỬ LÝ TOUCH (CHỈ NHẬN KHI MENU MỞ)
 // ==========================================
 - (void)updateIOWithTouchEvent:(UIEvent *)event {
-    if (!self.imguiReady) return;
+    if (!self.imguiReady || !MenDeal) return; // FIX: Menu đóng thì bỏ qua touch
     UITouch *touch = event.allTouches.anyObject;
     if (touch == nil) return;
 
@@ -121,6 +123,7 @@ static bool MenDeal = true;
     }
 }
 
+// Các hàm này chỉ được gọi khi view này hiển thị và nhận touch
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event { [self updateIOWithTouchEvent:event]; }
@@ -139,23 +142,5 @@ static bool MenDeal = true;
         self.imguiReady = NO;
     }
 }
-
-// ==========================================
-// MẤY CÁI HÀM HOOK CỦA MÀY (Bỏ comment để xài)
-// ==========================================
-/*
-- (void)setupHooks {
-    // HOOK(ENCRYPTOFFSET("0x61E0F48"), _cam, cam); 
-    // HOOK(ENCRYPTOFFSET("0x61DFF50"), _Update, Update); 
-    // HOOK(ENCRYPTOFFSET("0x61E1370"), _highrate, highrate); 
-    // HOOK(ENCRYPTOFFSET("0x59EC6F4"), IsSmartUse, _IsSmartUse); 
-    // HOOK(ENCRYPTOFFSET("0x57CC0F4"), get_IsUseCameraMoveWithIndicator, _get_IsUseCameraMoveWithIndicator); 
-    // HOOK(ENCRYPTOFFSET("0x64C773C"), IsDistanceLowerEqualAsAttacker, old_IsDistanceLowerEqualAsAttacker); 
-    // HOOK(ENCRYPTOFFSET("0x5AD7B84"), IsUseSkillJoystick, _IsUseSkillJoystick); 
-    // HOOK(ENCRYPTOFFSET("0x5A6A764"), SetPlayerName, old_SetPlayerName); 
-    // HOOK(ENCRYPTOFFSET("0x547FB70"), _Autowin, Autowin); 
-    // HOOK(ENCRYPTOFFSET("0x53AC920"), LActorRoot_Visible, _LActorRoot_Visible); 
-}
-*/
 
 @end
